@@ -72,8 +72,8 @@ object Magic extends App {
       val csrFile = saveFile(csrPem, domain, "csr")
 
       // give details to user
-      println(s"Written encrypted PK to $pkEncFile")
-      println(s"Written CSR to $csrFile")
+      println(csrPem)
+      println(s"Written encrypted PK to $pkEncFile and CSR to $csrFile")
 
     case Config("install", _, profile, certificate, chain) =>
       val aws = new AwsEncryption()

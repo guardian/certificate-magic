@@ -1,0 +1,16 @@
+= Certificate Magic!
+
+Certificate Magic! helps make it easy create an install certificates.
+
+This process is typically in two phases - creating a private key and certificate signing request and then, when you later get a certificate uploading it into AWS.
+
+The app has `create` and `install` commands that cover these two phases.
+
+== Create
+
+This creates a keypair and certificate signing request for the given domain. The private key is encrypted using AWS KMS and stored under ~/.magic in your home directory. The CSR is displayed (and also saved to a file) so that you can send the CSR to a CA for signing.
+
+== Install
+
+When you get your certificate back, use the install mode to validate and upload your certificate into IAM. The private key will be decrypted appropriately and installed alongside the certificate and certificate chain.
+
