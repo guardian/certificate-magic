@@ -1,10 +1,9 @@
 package com.gu.certificate
 
 import java.io.File
+import java.nio.ByteBuffer
 
 import scalax.file.Path
-import scalax.io.Resource
-
 
 object Magic extends App {
   case class Config(mode:String="", domain:String="", awsProfile:Option[String]=None, certificate:Option[File]=None, chain:Option[File]=None)
@@ -31,33 +30,60 @@ object Magic extends App {
 
   def homeDir = Option(System.getProperty("user.home"))
 
-  def saveFile(content:String, domain:String, ext:String): File = {
+  def getFile(domain:String, ext:String) = {
     val path = Path.fromString(s"${homeDir.get}/.magic")
     path.createDirectory(createParents = true, failIfExists = false)
-    val file = path / s"${safeDomainString(domain)}.$ext"
+    path / s"${safeDomainString(domain)}.$ext"
+  }
+
+  def saveFile(content:String, domain:String, ext:String): File = {
+    val file = getFile(domain, ext)
     file.write(content)
     file.fileOption.get
   }
+
+  def saveFile(content:ByteBuffer, domain:String, ext:String): File = {
+    val file = getFile(domain, ext)
+    file.write(content)
+    file.fileOption.get
+  }
+
+  def readBytes(domain:String, ext:String): ByteBuffer = {
+    val file = getFile(domain, ext)
+    ByteBuffer.wrap(file.byteArray)
+  }
+
 
   parser.parse(args, Config()) foreach {
     case Config("create", domain, profile, _, _) =>
       // create keypair
       val keyPair = BouncyCastle.createKeyPair()
-      val privateKey = keyPair.getPrivate
       val pkPem = BouncyCastle.toPem(keyPair.getPrivate)
-      // TODO: encrypt keypair to disk
-      val pkFile = saveFile(pkPem, domain, "pk")
-      println(s"Written PK to $pkFile")
+
+      // encrypt private key with KMS
+      val aws = new AwsEncryption()
+      val keyId = aws.getCertificateMagicKey
+      val ciphertext = aws.encrypt(keyId, pkPem, domain)
+      val pkEncFile = saveFile(ciphertext, domain, "pkenc")
+
       // create CSR
-      val csr = BouncyCastle.createCsr(keyPair, domain)
-      val csrPem = BouncyCastle.toPem(csr)
-      println(s"CSR: $csrPem")
+      val csrPem= BouncyCastle.toPem(BouncyCastle.createCsr(keyPair, domain))
       // display/save CSR
       val csrFile = saveFile(csrPem, domain, "csr")
+
+      // give details to user
+      println(s"Written encrypted PK to $pkEncFile")
       println(s"Written CSR to $csrFile")
+
     case Config("install", _, profile, certificate, chain) =>
+      val aws = new AwsEncryption()
       // inspect certificate to discover domain
-      // find and decrypt keypair
+      val domain = ???
+      // find and decrypt private key
+      val readPkEncFile = readBytes(domain, "pkenc")
+      val decryptedPem = aws.decrypt(readPkEncFile, domain)
+      println(s"decrypted: $decryptedPem")
+
       // check certificate matches keypair? (or rely on AWS?)
       // build chain
       // upload to AWS
