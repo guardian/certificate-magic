@@ -1,19 +1,28 @@
 package com.gu.certificate
 
 import java.io.File
-import java.nio.ByteBuffer
 
-import scalax.file.Path
+import com.amazonaws.auth.{STSAssumeRoleSessionCredentialsProvider, AWSCredentials, BasicAWSCredentials, AWSCredentialsProvider}
+import com.amazonaws.regions.{Region, Regions}
+import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClient
+import com.amazonaws.services.identitymanagement.model._
+import org.joda.time.DateTime
+import org.joda.time.format.ISODateTimeFormat
 
-object Magic extends App {
-  case class Config(mode:String="", domain:String="", awsProfile:Option[String]=None, certificate:Option[File]=None, chain:Option[File]=None)
+import scala.util.Try
+import scalax.io.Resource
+
+object Magic extends App with BouncyCastle with FileHelpers {
+  case class Config(mode:String="", domain:String="", awsProfile:Option[String]=None, certificate:Option[File]=None, chain:Option[File]=None, force:Boolean=false, awsRegion:Option[String]=None)
 
   val parser = new scopt.OptionParser[Config]("magic") {
     head("certificate magic", "1.0")
     opt[String]('p', "profile") optional() action { (x, c) => c.copy(awsProfile = Some(x)) }
+    opt[String]('r', "region") optional() action { (x, c) => c.copy(awsRegion = Some(x)) }
     cmd("create") action { (_, c) =>
       c.copy(mode = "create") } text "create a new keypair and certificate signing request (CSR)" children(
-        opt[String]('d', "domain") required() action { (x, c) => c.copy(domain = x) }
+        opt[String]('d', "domain") required() action { (x, c) => c.copy(domain = x) },
+        opt[Unit]('f', "force") optional() action { (_, c) => c.copy(force = true) }
       )
     cmd("install") action { (_, c) =>
       c.copy(mode = "install") } text "install a certificate" children(
@@ -22,73 +31,135 @@ object Magic extends App {
       opt[File]("chain") optional() action { (x, c) =>
         c.copy(chain = Some(x)) } text "provided certificate chain (will try to build it if not provided)"
       )
+    cmd("list") action { (_, c) => c.copy(mode = "list") }
   }
 
-  def safeDomainString(domain: String): String = {
-    domain.replace("*", "star")
+  def safeDomainString(domain: String): String = domain.replace("*", "star")
+
+  def withTempCredentials[T](region: Region, policyArn: String)(block: AWSCredentialsProvider => T) = {
+    val iamClient = region.createClient(classOf[AmazonIdentityManagementClient], null, null)
+
+    // create credentials
+    val dateTime = ISODateTimeFormat.basicDateTimeNoMillis().print(new DateTime())
+    val userName = s"certificate-magic-$dateTime"
+    iamClient.createUser(new CreateUserRequest().withUserName(userName))
+
+    try {
+      iamClient.attachUserPolicy(new AttachUserPolicyRequest().withUserName(userName).withPolicyArn(policyArn))
+      val accessKeyResult = iamClient.createAccessKey(new CreateAccessKeyRequest().withUserName(userName))
+
+      // create provider
+      val provider:AWSCredentialsProvider =
+        new AWSCredentialsProvider {
+          def refresh() {}
+          val getCredentials: AWSCredentials = new BasicAWSCredentials(
+            accessKeyResult.getAccessKey.getAccessKeyId,
+            accessKeyResult.getAccessKey.getSecretAccessKey
+          )
+        }
+
+      // run code
+      block(provider)
+    } finally {
+      // delete credentials
+      iamClient.deleteUser(new DeleteUserRequest().withUserName(userName))
+    }
   }
 
-  def homeDir = Option(System.getProperty("user.home"))
+  def assumeRole[T](region: Region, roleArn: String)(block: AWSCredentialsProvider => T) = {
+    val dateTime = ISODateTimeFormat.basicDateTimeNoMillis().print(new DateTime())
+    val userName = s"certificate-magic-$dateTime"
 
-  def getFile(domain:String, ext:String) = {
-    val path = Path.fromString(s"${homeDir.get}/.magic")
-    path.createDirectory(createParents = true, failIfExists = false)
-    path / s"${safeDomainString(domain)}.$ext"
+    val provider = new STSAssumeRoleSessionCredentialsProvider(roleArn, userName)
+    // run code
+    block(provider)
   }
 
-  def saveFile(content:String, domain:String, ext:String): File = {
-    val file = getFile(domain, ext)
-    file.write(content)
-    file.fileOption.get
-  }
+  parser.parse(args, Config()) foreach { config =>
+    val region = Region.getRegion(
+      config.awsRegion
+        .orElse(Option(System.getenv("AWS_DEFAULT_REGION")))
+        .map(Regions.fromName)
+        .getOrElse(Regions.EU_WEST_1)
+    )
 
-  def saveFile(content:ByteBuffer, domain:String, ext:String): File = {
-    val file = getFile(domain, ext)
-    file.write(content)
-    file.fileOption.get
-  }
+    config match {
+      case Config("create", domain, profile, _, _, force, _) =>
+        val safeDomain = safeDomainString(domain)
+        // check if private key already exists
+        if (!force) {
+          val encryptedKey = getFile(safeDomain, "pkenc")
+          if (encryptedKey.exists) throw new RuntimeException(s"Private key already exists at $encryptedKey, use --force to overwrite if you are sure you no longer need this private key")
+        }
 
-  def readBytes(domain:String, ext:String): ByteBuffer = {
-    val file = getFile(domain, ext)
-    ByteBuffer.wrap(file.byteArray)
-  }
+        // create keypair
+        val keyPair = createKeyPair()
+        val pkPem = toPem(keyPair.getPrivate)
 
+        // encrypt private key with KMS
+        val aws = new AwsEncryption(region)
+        val keyId = aws.getCertificateMagicKey
+        val ciphertext = aws.encrypt(keyId, pkPem, domain)
+        val pkEncFile = saveFile(ciphertext, safeDomain, "pkenc")
 
-  parser.parse(args, Config()) foreach {
-    case Config("create", domain, profile, _, _) =>
-      // create keypair
-      val keyPair = BouncyCastle.createKeyPair()
-      val pkPem = BouncyCastle.toPem(keyPair.getPrivate)
+        // create CSR
+        val csrPem = toPem(createCsr(keyPair, domain))
+        // display/save CSR
+        val csrFile = saveFile(csrPem, safeDomain, "csr")
 
-      // encrypt private key with KMS
-      val aws = new AwsEncryption()
-      val keyId = aws.getCertificateMagicKey
-      val ciphertext = aws.encrypt(keyId, pkPem, domain)
-      val pkEncFile = saveFile(ciphertext, domain, "pkenc")
+        // give details to user
+        println(csrPem)
+        System.err.println(s"Written encrypted PK to $pkEncFile and CSR to $csrFile")
 
-      // create CSR
-      val csrPem= BouncyCastle.toPem(BouncyCastle.createCsr(keyPair, domain))
-      // display/save CSR
-      val csrFile = saveFile(csrPem, domain, "csr")
+      case Config("install", _, profile, Some(certificateFile), chainFile, _, _) =>
+        val aws = new AwsEncryption(region)
 
-      // give details to user
-      println(csrPem)
-      println(s"Written encrypted PK to $pkEncFile and CSR to $csrFile")
+        // read in and inspect certificate
+        val certificatePem = Resource.fromFile(certificateFile).string
+        val certificate = readCertificate(certificatePem).getOrElse {
+          throw new RuntimeException(s"Couldn't read certificate at $certificateFile")
+        }
+        val domain = getCommonName(certificate)
+        val safeDomain = safeDomainString(domain)
+        val expDate = ISODateTimeFormat.date().print(new DateTime(certificate.getNotAfter))
 
-    case Config("install", _, profile, certificate, chain) =>
-      val aws = new AwsEncryption()
-      // inspect certificate to discover domain
-      val domain = ???
-      // find and decrypt private key
-      val readPkEncFile = readBytes(domain, "pkenc")
-      val decryptedPem = aws.decrypt(readPkEncFile, domain)
-      println(s"decrypted: $decryptedPem")
+        // find and decrypt private key
+        val readPkEncFile = Try(readBytes(safeDomain, "pkenc")).getOrElse {
+          throw new RuntimeException(s"Couldn't find encrypted private key for $domain")
+        }
+        val decryptedPem = aws.decrypt(readPkEncFile, domain)
 
-      // check certificate matches keypair? (or rely on AWS?)
-      // build chain
-      // upload to AWS
-        // create temporary IAM credentials
-        // do upload
-        // delete temporary IAM credentials
+        // check certificate matches keypair
+        val keypair = readKeyPair(decryptedPem).getOrElse(throw new RuntimeException(s"Couldn't read decrypted private key"))
+        val keyPairPublicKey = keypair.getPublicKeyInfo.getPublicKeyData.getBytes.toList
+        val certPublicKey = certificate.getSubjectPublicKeyInfo.getPublicKeyData.getBytes.toList
+        assert(
+          keyPairPublicKey == certPublicKey,
+          s"Invalid certificate: Public key in certificate and public key in stored keypair do not match"
+        )
+
+        System.err.println(s"decrypted: $decryptedPem")
+
+        // load or build chain
+        val chainPem: String = chainFile.map { file =>
+          Resource.fromFile(file).string
+        }.getOrElse {
+          getChainFromCertificate(certificate).map(toPem(_).trim).mkString("\n")
+        }
+
+        println(chainPem)
+
+        // upload to AWS
+        assumeRole(region, "arn:aws:iam::aws:policy/IAMFullAccess") { provider =>
+          val iamClient = region.createClient(classOf[AmazonIdentityManagementClient], provider, null)
+          iamClient.uploadServerCertificate(
+            new UploadServerCertificateRequest()
+              .withServerCertificateName(s"$safeDomain-exp$expDate")
+              .withPrivateKey(decryptedPem)
+              .withCertificateBody(certificatePem)
+              .withCertificateChain(chainPem)
+          )
+        }
+    }
   }
 }

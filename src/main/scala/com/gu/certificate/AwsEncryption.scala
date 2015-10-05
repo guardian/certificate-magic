@@ -9,14 +9,13 @@ import com.amazonaws.services.kms.AWSKMSClient
 import com.amazonaws.services.kms.model._
 import scala.collection.JavaConverters._
 
-class AwsEncryption {
+class AwsEncryption(region: Region) {
   val alias = "alias/certificate-magic"
 
   val charset = Charset.forName("UTF-8")
   val encoder = charset.newEncoder()
   val decoder = charset.newDecoder()
 
-  val region = Region.getRegion(Regions.EU_WEST_1)
   val client = region.createClient(classOf[AWSKMSClient], null, null)
 
   def createKeyWithAlias(alias: String) {
