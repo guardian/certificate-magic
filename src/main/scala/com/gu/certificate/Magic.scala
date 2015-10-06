@@ -15,7 +15,7 @@ import scalax.io.Resource
 
 object Magic extends BouncyCastle with FileHelpers {
 
-  def create(domain: String, profile: Option[String], force: Boolean, regionNameOpt: Option[String]) = {
+  def create(domain: String, profile: Option[String], force: Boolean, regionNameOpt: Option[String]): Unit = {
     val region = getRegion(regionNameOpt)
     val safeDomain = safeDomainString(domain)
     // check if private key already exists
@@ -44,7 +44,7 @@ object Magic extends BouncyCastle with FileHelpers {
     System.err.println(s"Written encrypted PK to $pkEncFile and CSR to $csrFile")
   }
 
-  def install(profile: Option[String], certificateFile: File, chainFile: Option[File], regionNameOpt: Option[String]) = {
+  def install(profile: Option[String], certificateFile: File, chainFile: Option[File], regionNameOpt: Option[String]): Unit = {
     val region = getRegion(regionNameOpt)
     val aws = new AwsEncryption(region)
 
@@ -92,6 +92,11 @@ object Magic extends BouncyCastle with FileHelpers {
           .withCertificateChain(chainPem)
       )
     }
+  }
+
+  def list(): Unit = {
+    val csrNames = getFiles("csr") map (_.getName.stripSuffix(".csr"))
+    System.err.println(csrNames mkString ", ")
   }
 
   private def safeDomainString(domain: String): String = domain.replace("*", "star")
