@@ -10,7 +10,7 @@ trait FileHelpers {
   def homeDir = Option(System.getProperty("user.home"))
 
   def getFile(domain:String, ext:String): DefaultPath = {
-    val path = Path.fromString(s"${homeDir.get}/.magic")
+    val path = Path.fromString(s"${homeDir.get}/.certmagic")
     path.createDirectory(createParents = true, failIfExists = false)
     path / s"$domain.$ext"
   }
