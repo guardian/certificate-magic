@@ -4,6 +4,8 @@ import java.io.File
 
 
 object Main extends App {
+  import Magic._
+
   case class Config(mode:String="", domain:String="", awsProfile:Option[String]=None, certificate:Option[File]=None, chain:Option[File]=None, force:Boolean=false, awsRegionName:Option[String]=None)
 
   val parser = new scopt.OptionParser[Config]("magic") {
@@ -22,18 +24,17 @@ object Main extends App {
       opt[File]("chain") optional() action { (x, c) =>
         c.copy(chain = Some(x)) } text "provided certificate chain (will try to build it if not provided)"
       )
-    cmd("list") action { (_, c) => c.copy(mode = "list") }
+    cmd("list") action { (_, c) => c.copy(mode = "list") } text "Lists the domains that have CSRs stored locally"
   }
 
   parser.parse(args, Config()) foreach {
     case Config("create", domain, profile, _, _, force, regionNameOpt) =>
-      Magic.create(domain, profile, force, regionNameOpt)
+      create(domain, profile, force, regionNameOpt)
 
     case Config("install", _, profile, Some(certificateFile), chainFile, _, regionNameOpt) =>
-      Magic.install(profile, certificateFile, chainFile, regionNameOpt)
+      install(profile, certificateFile, chainFile, regionNameOpt)
 
     case Config("list", _, _, _, _, _, _) =>
-      ???
+      list()
   }
-
 }
