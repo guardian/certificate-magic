@@ -1,10 +1,10 @@
 = Certificate Magic!
 
-Certificate Magic! helps make it easy create an install certificates.
+Certificate Magic! helps make it easy create and install certificates.
 
 This process is typically in two phases - creating a private key and certificate signing request and then, when you later get a certificate uploading it into AWS.
 
-The app has `create` and `install` commands that cover these two phases.
+The app has `create` and `install` commands that cover these two phases as well as `list` for tracking requests.
 
 == Create
 
@@ -14,3 +14,6 @@ This creates a keypair and certificate signing request for the given domain. The
 
 When you get your certificate back, use the install mode to validate and upload your certificate into IAM. The private key will be decrypted appropriately and installed alongside the certificate and certificate chain.
 
+== List
+
+List the private keys and CSRs that are outstanding.

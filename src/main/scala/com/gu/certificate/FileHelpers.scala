@@ -6,13 +6,16 @@ import java.nio.ByteBuffer
 import scalax.file.Path
 
 trait FileHelpers {
-  def homeDir = Option(System.getProperty("user.home"))
+  lazy val homeDir = Option(System.getProperty("user.home"))
+  lazy val magicDir = s"${homeDir.get}/.magic"
+  lazy val magicPath = Path.fromString(magicDir)
 
   def getFile(domain:String, ext:String) = {
-    val path = Path.fromString(s"${homeDir.get}/.magic")
-    path.createDirectory(createParents = true, failIfExists = false)
-    path / s"$domain.$ext"
+    magicPath.createDirectory(createParents = true, failIfExists = false)
+    magicPath / s"$domain.$ext"
   }
+
+  def listFiles(ext:String) = magicPath ** s"*.$ext"
 
   def saveFile(content:String, domain:String, ext:String): File = {
     val file = getFile(domain, ext)

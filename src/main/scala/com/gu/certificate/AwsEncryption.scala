@@ -4,19 +4,20 @@ import java.nio.{CharBuffer, ByteBuffer}
 import java.nio.charset.Charset
 
 import com.amazonaws.ClientConfiguration
+import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.regions.{Regions, Region}
 import com.amazonaws.services.kms.AWSKMSClient
 import com.amazonaws.services.kms.model._
 import scala.collection.JavaConverters._
 
-class AwsEncryption(region: Region) {
+class AwsEncryption(region: Region, provider: AWSCredentialsProvider) {
   val alias = "alias/certificate-magic"
 
   val charset = Charset.forName("UTF-8")
   val encoder = charset.newEncoder()
   val decoder = charset.newDecoder()
 
-  val client = region.createClient(classOf[AWSKMSClient], null, null)
+  val client = region.createClient(classOf[AWSKMSClient], provider, null)
 
   def createKeyWithAlias(alias: String) {
     val createKeyRequest = new CreateKeyRequest().withDescription("For securing private keys whilst getting certificates issued with certificate-magic")
@@ -63,8 +64,5 @@ class AwsEncryption(region: Region) {
     val result = client.describeKey(request)
     result.getKeyMetadata
   }
-//  def encrypt(content:String) = {
-//    val request = new EncryptRequest().w
-//    client.encrypt()
-//  }
+
 }

@@ -2,7 +2,8 @@ package com.gu.certificate
 
 import java.io.File
 
-import com.amazonaws.auth.{STSAssumeRoleSessionCredentialsProvider, AWSCredentials, BasicAWSCredentials, AWSCredentialsProvider}
+import com.amazonaws.auth.profile.ProfileCredentialsProvider
+import com.amazonaws.auth._
 import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClient
 import com.amazonaws.services.identitymanagement.model._
@@ -76,12 +77,18 @@ object Magic extends App with BouncyCastle with FileHelpers {
   }
 
   parser.parse(args, Config()) foreach { config =>
-    val region = Region.getRegion(
+    lazy val region = Region.getRegion(
       config.awsRegion
         .orElse(Option(System.getenv("AWS_DEFAULT_REGION")))
         .map(Regions.fromName)
         .getOrElse(Regions.EU_WEST_1)
     )
+
+    lazy val provider = config.awsProfile.map { profile =>
+      new ProfileCredentialsProvider(profile)
+    }.getOrElse(new DefaultAWSCredentialsProviderChain())
+
+    lazy val cryptProvider = new AwsEncryption(region, provider)
 
     config match {
       case Config("create", domain, profile, _, _, force, _) =>
@@ -97,9 +104,8 @@ object Magic extends App with BouncyCastle with FileHelpers {
         val pkPem = toPem(keyPair.getPrivate)
 
         // encrypt private key with KMS
-        val aws = new AwsEncryption(region)
-        val keyId = aws.getCertificateMagicKey
-        val ciphertext = aws.encrypt(keyId, pkPem, domain)
+        val keyId = cryptProvider.getCertificateMagicKey
+        val ciphertext = cryptProvider.encrypt(keyId, pkPem, domain)
         val pkEncFile = saveFile(ciphertext, safeDomain, "pkenc")
 
         // create CSR
@@ -111,9 +117,7 @@ object Magic extends App with BouncyCastle with FileHelpers {
         println(csrPem)
         System.err.println(s"Written encrypted PK to $pkEncFile and CSR to $csrFile")
 
-      case Config("install", _, profile, Some(certificateFile), chainFile, _, _) =>
-        val aws = new AwsEncryption(region)
-
+      case Config("install", _, _, Some(certificateFile), chainFile, _, _) =>
         // read in and inspect certificate
         val certificatePem = Resource.fromFile(certificateFile).string
         val certificate = readCertificate(certificatePem).getOrElse {
@@ -127,7 +131,7 @@ object Magic extends App with BouncyCastle with FileHelpers {
         val readPkEncFile = Try(readBytes(safeDomain, "pkenc")).getOrElse {
           throw new RuntimeException(s"Couldn't find encrypted private key for $domain")
         }
-        val decryptedPem = aws.decrypt(readPkEncFile, domain)
+        val decryptedPem = cryptProvider.decrypt(readPkEncFile, domain)
 
         // check certificate matches keypair
         val keypair = readKeyPair(decryptedPem).getOrElse(throw new RuntimeException(s"Couldn't read decrypted private key"))
@@ -150,16 +154,23 @@ object Magic extends App with BouncyCastle with FileHelpers {
         println(chainPem)
 
         // upload to AWS
-        assumeRole(region, "arn:aws:iam::aws:policy/IAMFullAccess") { provider =>
-          val iamClient = region.createClient(classOf[AmazonIdentityManagementClient], provider, null)
-          iamClient.uploadServerCertificate(
-            new UploadServerCertificateRequest()
-              .withServerCertificateName(s"$safeDomain-exp$expDate")
-              .withPrivateKey(decryptedPem)
-              .withCertificateBody(certificatePem)
-              .withCertificateChain(chainPem)
-          )
-        }
+        val iamClient = region.createClient(classOf[AmazonIdentityManagementClient], provider, null)
+        iamClient.uploadServerCertificate(
+          new UploadServerCertificateRequest()
+            .withServerCertificateName(s"$safeDomain-exp$expDate")
+            .withPrivateKey(decryptedPem)
+            .withCertificateBody(certificatePem)
+            .withCertificateChain(chainPem)
+        )
+
+        // TODO: [optionally?] delete the associated files so the private key is no longer around
+
+      case Config("list", _, _, _, _, _, _) =>
+
+        System.err.println("Currently created keys")
+        // TODO: Read in subject form CSR and print in a more friendly format
+        println(listFiles("csr").toSet)
+        println(listFiles("pkenc").toSet)
     }
   }
 }
