@@ -63,8 +63,4 @@ class AwsEncryption(region: Region) {
     val result = client.describeKey(request)
     result.getKeyMetadata
   }
-//  def encrypt(content:String) = {
-//    val request = new EncryptRequest().w
-//    client.encrypt()
-//  }
 }
