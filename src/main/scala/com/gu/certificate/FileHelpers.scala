@@ -3,8 +3,7 @@ package com.gu.certificate
 import java.io.File
 import java.nio.ByteBuffer
 
-import scalax.file.Path
-import scalax.file.defaultfs.DefaultPath
+import scalax.file.{Path, PathSet}
 
 trait FileHelpers {
   lazy val homeDir = Option(System.getProperty("user.home"))
@@ -16,7 +15,10 @@ trait FileHelpers {
     magicPath / s"$domain.$ext"
   }
 
-  def listFiles(ext:String) = magicPath ** s"*.$ext"
+  def listFiles(ext:String): PathSet[Path] = {
+    if (magicPath.exists) magicPath ** s"*.$ext"
+    else PathSet()
+  }
 
   def saveFile(content:String, domain:String, ext:String): File = {
     val file = getFile(domain, ext)
