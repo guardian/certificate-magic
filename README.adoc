@@ -4,7 +4,7 @@ Certificate Magic! helps make it easy create and install certificates.
 
 This process is typically in two phases - creating a private key and certificate signing request and then, when you later get a certificate uploading it into AWS.
 
-The app has `create` and `install` commands that cover these two phases as well as `list` for tracking requests.
+The app has `create` and `install` commands that cover these two phases as well as `list` for tracking requests. Once a certificate has been successfully installed the `tidy` command will remove the intermediate files.
 
 == Create
 
@@ -17,3 +17,7 @@ When you get your certificate back, use the install mode to validate and upload 
 == List
 
 List the private keys and CSRs that are outstanding.
+
+== Tidy
+
+Deletes the files associated with a domain to remove any access to the private key. This should be done after a domain is installed and has been tested.

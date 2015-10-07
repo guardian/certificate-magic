@@ -16,10 +16,10 @@ import scalax.io.Resource
 
 object Magic extends BouncyCastle with FileHelpers {
 
-  def create(domain: String, awsProfile: Option[String], force: Boolean, regionNameOpt: Option[String]): Unit = {
+  def create(domain: String, awsProfileOpt: Option[String], force: Boolean, regionNameOpt: Option[String]): Unit = {
     val region = getRegion(regionNameOpt)
     val safeDomain = safeDomainString(domain)
-    val credentialsProvider = getCredentialsProvider(awsProfile)
+    val credentialsProvider = getCredentialsProvider(awsProfileOpt)
 
     // check if private key already exists
     if (!force) {
@@ -98,8 +98,6 @@ object Magic extends BouncyCastle with FileHelpers {
     )
 
     System.err.println(s"successfully installed certificate in IAM as ${uploadResult.getServerCertificateMetadata.getArn}")
-
-    // TODO: [optionally?] delete the associated files so the private key is no longer around
   }
 
   def list(): Unit = {
@@ -107,6 +105,23 @@ object Magic extends BouncyCastle with FileHelpers {
     // TODO: Read in subject from CSR and print in a more friendly format
     println(listFiles("csr").toSet)
     println(listFiles("pkenc").toSet)
+  }
+
+  def tidy(domain: String): Unit = {
+    System.err.println("This will delete the encrypted private key and CSR")
+    System.err.println(s"${Console.RED}*** THIS CANNOT BE UNDONE ***${Console.RESET}")
+    System.err.println("make sure you have tested the certificate is correctly installed before running this command")
+    val choice = scala.io.StdIn.readLine("proceed [y/N] ")
+    if (choice.toLowerCase == "y") {
+      if (exists(domain, "csr")) {
+        deleteFile(domain, "csr")
+        println(s"deleted csr for $domain")
+      }
+      if (exists(domain, "pkenc")) {
+        deleteFile(domain, "pkenc")
+        println(s"deleted encrypted private key for $domain")
+      }
+    }
   }
 
   private def safeDomainString(domain: String) = domain.replace("*", "star")

@@ -25,6 +25,10 @@ object Main extends App {
         c.copy(installProfile = Some(x)) } text "alternate AWS profile to use to install the certificate"
       )
     cmd("list") action { (_, c) => c.copy(mode = "list") }
+    cmd("tidy") action { (_, c) =>
+      c.copy(mode = "tidy") } text "delete files associated with this domain" children(
+        opt[String]('d', "domain") required() action { (x, c) => c.copy(domain = x) }
+      )
   }
 
   parser.parse(args, Config()) foreach {
@@ -36,6 +40,8 @@ object Main extends App {
 
     case Config("list", _, _, _, _, _, _, _) =>
       Magic.list()
-  }
 
+    case Config("tidy", domain, _, _, _, _, _, _) =>
+      Magic.tidy(domain)
+  }
 }
