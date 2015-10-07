@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.ByteBuffer
 
 import scalax.file.Path
+import scalax.file.defaultfs.DefaultPath
 
 trait FileHelpers {
   lazy val homeDir = Option(System.getProperty("user.home"))

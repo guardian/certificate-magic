@@ -11,5 +11,7 @@ libraryDependencies ++= Seq(
   "com.github.scopt" %% "scopt" % "3.3.0",
   "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3",
   "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.4",
+  "joda-time" % "joda-time" % "2.8.1",
+  "org.joda" % "joda-convert" % "1.8",
   "org.scalatest" %% "scalatest" % "2.2.4" % "test"
 )

@@ -1,13 +1,13 @@
 package com.gu.certificate
 
-import java.nio.{CharBuffer, ByteBuffer}
 import java.nio.charset.Charset
+import java.nio.{ByteBuffer, CharBuffer}
 
-import com.amazonaws.ClientConfiguration
 import com.amazonaws.auth.AWSCredentialsProvider
-import com.amazonaws.regions.{Regions, Region}
+import com.amazonaws.regions.Region
 import com.amazonaws.services.kms.AWSKMSClient
 import com.amazonaws.services.kms.model._
+
 import scala.collection.JavaConverters._
 
 class AwsEncryption(region: Region, provider: AWSCredentialsProvider) {
@@ -64,5 +64,4 @@ class AwsEncryption(region: Region, provider: AWSCredentialsProvider) {
     val result = client.describeKey(request)
     result.getKeyMetadata
   }
-
 }
