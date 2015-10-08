@@ -108,18 +108,30 @@ object Magic extends BouncyCastle with FileHelpers {
   }
 
   def tidy(domain: String): Unit = {
-    System.err.println("This will delete the encrypted private key and CSR")
-    System.err.println(s"${Console.RED}*** THIS CANNOT BE UNDONE ***${Console.RESET}")
-    System.err.println("make sure you have tested the certificate is correctly installed before running this command")
-    val choice = scala.io.StdIn.readLine("proceed [y/N] ")
-    if (choice.toLowerCase == "y") {
-      if (exists(domain, "csr")) {
-        deleteFile(domain, "csr")
-        println(s"deleted csr for $domain")
-      }
-      if (exists(domain, "pkenc")) {
-        deleteFile(domain, "pkenc")
-        println(s"deleted encrypted private key for $domain")
+    // check if there are files to tody up
+    val csrExists = exists(domain, "csr")
+    val pkencExists = exists(domain, "pkenc")
+
+    if (!pkencExists && !csrExists) {
+      System.err.println(s"No files found for $domain, nothing to tidy up")
+    } else {
+      // prompt for confirmation
+      if (csrExists) System.err.println(s"CSR file for $domain will be deleted")
+      if (pkencExists) System.err.println(s"Encrypted private key for $domain will be deleted")
+      System.err.println("make sure you have tested the certificate is correctly installed before running this command")
+      System.err.print("proceed [y/N] ")
+      Console.out.flush()
+      val choice = scala.io.StdIn.readLine()
+      if (choice.toLowerCase == "y") {
+        // delete files
+        if (csrExists) {
+          deleteFile(domain, "csr")
+          println(s"deleted csr for $domain")
+        }
+        if (pkencExists) {
+          deleteFile(domain, "pkenc")
+          println(s"deleted encrypted private key for $domain")
+        }
       }
     }
   }
