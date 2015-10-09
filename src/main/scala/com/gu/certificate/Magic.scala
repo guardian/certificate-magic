@@ -47,9 +47,10 @@ object Magic extends BouncyCastle with FileHelpers {
     System.err.println(s"Written encrypted PK to $pkEncFile and CSR to $csrFile")
   }
 
-  def install(awsProfile: Option[String], certificateFile: File, chainFile: Option[File], regionNameOpt: Option[String]): Unit = {
+  def install(keyProfile: Option[String], certificateFile: File, chainFile: Option[File], regionNameOpt: Option[String], installProfile:Option[String]): Unit = {
     val region = getRegion(regionNameOpt)
-    val credentialsProvider = getCredentialsProvider(awsProfile)
+    val keyCredentialsProvider = getCredentialsProvider(keyProfile)
+    val installCredentialsProvider = installProfile.map(ip => getCredentialsProvider(Some(ip))).getOrElse(keyCredentialsProvider)
 
     // read in and inspect certificate
     val certificatePem = Resource.fromFile(certificateFile).string
@@ -64,7 +65,7 @@ object Magic extends BouncyCastle with FileHelpers {
     val readPkEncFile = Try(readBytes(safeDomain, "pkenc")).getOrElse {
       throw new RuntimeException(s"Couldn't find encrypted private key for $domain")
     }
-    val cryptProvider = new AwsEncryption(region, credentialsProvider)
+    val cryptProvider = new AwsEncryption(region, keyCredentialsProvider)
     val decryptedPem = cryptProvider.decrypt(readPkEncFile, domain)
 
     // check certificate matches keypair
@@ -76,7 +77,7 @@ object Magic extends BouncyCastle with FileHelpers {
       s"Invalid certificate: Public key in certificate and public key in stored keypair do not match"
     )
 
-    System.err.println(s"decrypted: $decryptedPem")
+    System.err.println(s"successfully decrypted private key")
 
     // load or build chain
     val chainPem: String = chainFile.map { file =>
@@ -85,17 +86,18 @@ object Magic extends BouncyCastle with FileHelpers {
       getChainFromCertificate(certificate).map(toPem(_).trim).mkString("\n")
     }
 
-    // upload to AWS
-    assumeRole("arn:aws:iam::aws:policy/IAMFullAccess") { provider =>
-      val iamClient = region.createClient(classOf[AmazonIdentityManagementClient], provider, null)
-      iamClient.uploadServerCertificate(
-        new UploadServerCertificateRequest()
-          .withServerCertificateName(s"$safeDomain-exp$expDate")
-          .withPrivateKey(decryptedPem)
-          .withCertificateBody(certificatePem)
-          .withCertificateChain(chainPem)
-      )
-    }
+    System.err.println(s"installing to IAM")
+
+    val iamClient = region.createClient(classOf[AmazonIdentityManagementClient], installCredentialsProvider, null)
+    val uploadResult = iamClient.uploadServerCertificate(
+      new UploadServerCertificateRequest()
+        .withServerCertificateName(s"$safeDomain-exp$expDate")
+        .withPrivateKey(decryptedPem)
+        .withCertificateBody(certificatePem)
+        .withCertificateChain(chainPem)
+    )
+
+    System.err.println(s"successfully installed certificate in IAM as ${uploadResult.getServerCertificateMetadata.getArn}")
 
     // TODO: [optionally?] delete the associated files so the private key is no longer around
   }
@@ -108,15 +110,6 @@ object Magic extends BouncyCastle with FileHelpers {
   }
 
   private def safeDomainString(domain: String) = domain.replace("*", "star")
-
-  private def assumeRole[T](roleArn: String)(block: AWSCredentialsProvider => T): T = {
-    val dateTime = ISODateTimeFormat.basicDateTimeNoMillis().print(new DateTime())
-    val userName = s"certificate-magic-$dateTime"
-
-    val provider = new STSAssumeRoleSessionCredentialsProvider(roleArn, userName)
-    // run code
-    block(provider)
-  }
 
   private def getCredentialsProvider(awsProfile: Option[String]): AWSCredentialsProvider = {
     awsProfile.map { profile =>

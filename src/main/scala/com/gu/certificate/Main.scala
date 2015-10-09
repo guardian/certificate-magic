@@ -4,7 +4,7 @@ import java.io.File
 
 
 object Main extends App {
-  case class Config(mode:String="", domain:String="", awsProfile:Option[String]=None, certificate:Option[File]=None, chain:Option[File]=None, force:Boolean=false, awsRegionName:Option[String]=None)
+  case class Config(mode:String="", domain:String="", awsProfile:Option[String]=None, certificate:Option[File]=None, chain:Option[File]=None, force:Boolean=false, awsRegionName:Option[String]=None, installProfile:Option[String] = None)
 
   val parser = new scopt.OptionParser[Config]("magic") {
     head("certificate magic", "1.0")
@@ -20,19 +20,21 @@ object Main extends App {
       opt[File]("certificate") required() action { (x, c) =>
         c.copy(certificate = Some(x)) } text "provided certificate",
       opt[File]("chain") optional() action { (x, c) =>
-        c.copy(chain = Some(x)) } text "provided certificate chain (will try to build it if not provided)"
+        c.copy(chain = Some(x)) } text "provided certificate chain (will try to build it if not provided)",
+      opt[String]("installProfile") optional() action { (x, c) =>
+        c.copy(installProfile = Some(x)) } text "alternate AWS profile to use to install the certificate"
       )
     cmd("list") action { (_, c) => c.copy(mode = "list") }
   }
 
   parser.parse(args, Config()) foreach {
-    case Config("create", domain, profile, _, _, force, regionNameOpt) =>
+    case Config("create", domain, profile, _, _, force, regionNameOpt, _) =>
       Magic.create(domain, profile, force, regionNameOpt)
 
-    case Config("install", _, profile, Some(certificateFile), chainFile, _, regionNameOpt) =>
-      Magic.install(profile, certificateFile, chainFile, regionNameOpt)
+    case Config("install", _, profile, Some(certificateFile), chainFile, _, regionNameOpt, installProfile) =>
+      Magic.install(profile, certificateFile, chainFile, regionNameOpt, installProfile)
 
-    case Config("list", _, _, _, _, _, _) =>
+    case Config("list", _, _, _, _, _, _, _) =>
       Magic.list()
   }
 
