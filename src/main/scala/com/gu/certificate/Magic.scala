@@ -108,9 +108,10 @@ object Magic extends BouncyCastle with FileHelpers {
   }
 
   def tidy(domain: String): Unit = {
+    val safeDomain = safeDomainString(domain)
     // check if there are files to tody up
-    val csrExists = exists(domain, "csr")
-    val pkencExists = exists(domain, "pkenc")
+    val csrExists = exists(safeDomain, "csr")
+    val pkencExists = exists(safeDomain, "pkenc")
 
     if (!pkencExists && !csrExists) {
       System.err.println(s"No files found for $domain, nothing to tidy up")
@@ -125,12 +126,12 @@ object Magic extends BouncyCastle with FileHelpers {
       if (choice.toLowerCase == "y") {
         // delete files
         if (csrExists) {
-          deleteFile(domain, "csr")
-          println(s"deleted $domain.csr")
+          deleteFile(safeDomain, "csr")
+          println(s"deleted $safeDomain.csr")
         }
         if (pkencExists) {
-          deleteFile(domain, "pkenc")
-          println(s"deleted encrypted private key $domain.pkenc")
+          deleteFile(safeDomain, "pkenc")
+          println(s"deleted encrypted private key $safeDomain.pkenc")
         }
       }
     }
