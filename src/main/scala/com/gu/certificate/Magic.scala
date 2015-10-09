@@ -118,7 +118,7 @@ object Magic extends BouncyCastle with FileHelpers {
       // prompt for confirmation
       if (csrExists) System.err.println(s"CSR file for $domain will be deleted")
       if (pkencExists) System.err.println(s"Encrypted private key for $domain will be deleted")
-      System.err.println("make sure you have tested the certificate is correctly installed before running this command")
+      System.err.println(s"${Console.BOLD}make sure you have tested the certificate is correctly installed before running this command${Console.RESET}")
       System.err.print("proceed [y/N] ")
       Console.out.flush()
       val choice = scala.io.StdIn.readLine()
@@ -126,11 +126,11 @@ object Magic extends BouncyCastle with FileHelpers {
         // delete files
         if (csrExists) {
           deleteFile(domain, "csr")
-          println(s"deleted csr for $domain")
+          println(s"deleted $domain.csr")
         }
         if (pkencExists) {
           deleteFile(domain, "pkenc")
-          println(s"deleted encrypted private key for $domain")
+          println(s"deleted encrypted private key $domain.pkenc")
         }
       }
     }
