@@ -111,15 +111,6 @@ object Magic extends BouncyCastle with FileHelpers {
 
   private def safeDomainString(domain: String) = domain.replace("*", "star")
 
-  private def assumeRole[T](underlyingProvider: AWSCredentialsProvider, roleArn: String)(block: AWSCredentialsProvider => T): T = {
-    val dateTime = ISODateTimeFormat.basicDateTimeNoMillis().print(new DateTime())
-    val userName = s"certificate-magic-$dateTime"
-
-    val provider = new STSAssumeRoleSessionCredentialsProvider(underlyingProvider, roleArn, userName)
-    // run code
-    block(provider)
-  }
-
   private def getCredentialsProvider(awsProfile: Option[String]): AWSCredentialsProvider = {
     awsProfile.map { profile =>
       new ProfileCredentialsProvider(profile)
