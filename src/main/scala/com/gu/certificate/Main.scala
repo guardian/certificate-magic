@@ -10,6 +10,11 @@ object Main extends App {
     head("certificate magic", "1.0")
     opt[String]('p', "profile") optional() action { (x, c) => c.copy(awsProfile = Some(x)) }
     opt[String]('r', "region") optional() action { (x, c) => c.copy(awsRegionName = Some(x)) }
+    note(
+      """`create` generates the CSR you can to purchase the certifcate.
+        |Once that's done, run `install` to set it up in your account.
+        |After you've tested the certifcate `tidy` will delete the temporary files.
+        |""".stripMargin)
     cmd("create") action { (_, c) =>
       c.copy(mode = "create") } text "create a new keypair and certificate signing request (CSR)" children(
         opt[String]('d', "domain") required() action { (x, c) => c.copy(domain = x) },
@@ -24,7 +29,7 @@ object Main extends App {
       opt[String]("installProfile") optional() action { (x, c) =>
         c.copy(installProfile = Some(x)) } text "alternate AWS profile to use to install the certificate"
       )
-    cmd("list") action { (_, c) => c.copy(mode = "list") }
+    cmd("list") action { (_, c) => c.copy(mode = "list") } text "show pending CSRs / encrypted private keys"
     cmd("tidy") action { (_, c) =>
       c.copy(mode = "tidy") } text "delete files associated with this domain" children(
         opt[String]('d', "domain") required() action { (x, c) => c.copy(domain = x) }
@@ -43,5 +48,8 @@ object Main extends App {
 
     case Config("tidy", domain, _, _, _, _, _, _) =>
       Magic.tidy(domain)
+
+    case _ =>
+      parser.showUsage
   }
 }
