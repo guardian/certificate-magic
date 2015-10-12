@@ -7,7 +7,7 @@ import scalax.file.{Path, PathSet}
 
 trait FileHelpers {
   lazy val homeDir = Option(System.getProperty("user.home"))
-  lazy val magicDir = s"${homeDir.get}/.magic"
+  lazy val magicDir = s"${homeDir.get}/.certmagic"
   lazy val magicPath = Path.fromString(magicDir)
 
   def getFile(domain:String, ext:String) = {
