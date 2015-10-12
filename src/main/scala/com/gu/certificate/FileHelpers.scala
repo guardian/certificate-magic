@@ -37,4 +37,13 @@ trait FileHelpers {
     ByteBuffer.wrap(file.byteArray)
   }
 
+  def deleteFile(domain: String, ext: String): Unit = {
+    val file = getFile(domain, ext)
+    file.delete()
+  }
+
+  def exists(domain: String, ext: String): Boolean = {
+    val file = getFile(domain, ext)
+    file.exists
+  }
 }

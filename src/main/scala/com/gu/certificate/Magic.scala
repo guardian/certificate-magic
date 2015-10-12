@@ -16,10 +16,10 @@ import scalax.io.Resource
 
 object Magic extends BouncyCastle with FileHelpers {
 
-  def create(domain: String, awsProfile: Option[String], force: Boolean, regionNameOpt: Option[String]): Unit = {
+  def create(domain: String, awsProfileOpt: Option[String], force: Boolean, regionNameOpt: Option[String]): Unit = {
     val region = getRegion(regionNameOpt)
     val safeDomain = safeDomainString(domain)
-    val credentialsProvider = getCredentialsProvider(awsProfile)
+    val credentialsProvider = getCredentialsProvider(awsProfileOpt)
 
     // check if private key already exists
     if (!force) {
@@ -98,8 +98,6 @@ object Magic extends BouncyCastle with FileHelpers {
     )
 
     System.err.println(s"successfully installed certificate in IAM as ${uploadResult.getServerCertificateMetadata.getArn}")
-
-    // TODO: [optionally?] delete the associated files so the private key is no longer around
   }
 
   def list(): Unit = {
@@ -107,6 +105,36 @@ object Magic extends BouncyCastle with FileHelpers {
     // TODO: Read in subject from CSR and print in a more friendly format
     println(listFiles("csr").toSet)
     println(listFiles("pkenc").toSet)
+  }
+
+  def tidy(domain: String): Unit = {
+    val safeDomain = safeDomainString(domain)
+    // check if there are files to tody up
+    val csrExists = exists(safeDomain, "csr")
+    val pkencExists = exists(safeDomain, "pkenc")
+
+    if (!pkencExists && !csrExists) {
+      System.err.println(s"No files found for $domain, nothing to tidy up")
+    } else {
+      // prompt for confirmation
+      if (csrExists) System.err.println(s"CSR file for $domain will be deleted")
+      if (pkencExists) System.err.println(s"Encrypted private key for $domain will be deleted")
+      System.err.println(s"${Console.BOLD}make sure you have tested the certificate is correctly installed before running this command${Console.RESET}")
+      System.err.print("proceed [y/N] ")
+      Console.out.flush()
+      val choice = scala.io.StdIn.readLine()
+      if (choice.toLowerCase == "y") {
+        // delete files
+        if (csrExists) {
+          deleteFile(safeDomain, "csr")
+          println(s"deleted $safeDomain.csr")
+        }
+        if (pkencExists) {
+          deleteFile(safeDomain, "pkenc")
+          println(s"deleted encrypted private key $safeDomain.pkenc")
+        }
+      }
+    }
   }
 
   private def safeDomainString(domain: String) = domain.replace("*", "star")
