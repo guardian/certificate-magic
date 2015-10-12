@@ -11,6 +11,7 @@ import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 
 import scala.util.Try
+import scalax.file.Path
 import scalax.io.Resource
 
 
@@ -103,8 +104,8 @@ object Magic extends BouncyCastle with FileHelpers {
   def list(): Unit = {
     System.err.println("Currently created keys")
     // TODO: Read in subject from CSR and print in a more friendly format
-    println(listFiles("csr").toSet)
-    println(listFiles("pkenc").toSet)
+    println(listFiles("csr").toSet.map((path: Path) => path.name).mkString(" "))
+    println(listFiles("pkenc").toSet.map((path: Path) => path.name).mkString(" "))
   }
 
   def tidy(domain: String): Unit = {
