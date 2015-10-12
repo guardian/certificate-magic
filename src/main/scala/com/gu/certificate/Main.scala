@@ -11,7 +11,7 @@ object Main extends App {
     opt[String]('p', "profile") optional() action { (x, c) => c.copy(awsProfile = Some(x)) }
     opt[String]('r', "region") optional() action { (x, c) => c.copy(awsRegionName = Some(x)) }
     note(
-      """`create` generates the CSR you can to purchase the certifcate.
+      """`create` generates the CSR you can use to purchase the certifcate.
         |Once that's done, run `install` to set it up in your account.
         |After you've tested the certifcate `tidy` will delete the temporary files.
         |""".stripMargin)
