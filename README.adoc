@@ -12,10 +12,8 @@ To set up a new certificate in AWS perform the following steps
 
 == Installing Certificate Magic!
 
-Fetch the latest jar file from the releases section of this repo, as
-well as the executable script to run the program.
+https://github.com/guardian/certificate-magic/releases/latest[Fetch the latest jar file from the releases section of this repo via this link].
 
-(Grab the latest jar from this link)[https://github.com/guardian/certificate-magic/releases/latest].
 You can then run Certificate Magic! directly using
 `java -jar <path to>/cert-magic.jar <args>`
 but it's usually simpler to create an executable script you can use
