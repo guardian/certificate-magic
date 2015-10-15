@@ -15,3 +15,5 @@ libraryDependencies ++= Seq(
   "org.joda" % "joda-convert" % "1.8",
   "org.scalatest" %% "scalatest" % "2.2.4" % "test"
 )
+
+assemblyJarName in assembly := "cert-magic.jar"
