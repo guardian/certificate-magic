@@ -39,7 +39,6 @@ installation)
 
     cert-magic tidy -d www.example.com
 
-
 == Commands
 
 Here is a little more detail on each command
@@ -62,7 +61,7 @@ If you are uploading the same certificate to multiple AWS accounts
 you'll need to use the optional `installProfile` flag. This allows you
 to specify a profile to use for the certificate installation.  You'll
 still need to provide the same profile you used to create the
-certificate so that the private key can be correctly unencrypted. In
+certificate so that the private key can be correctly decrypted. In
 this way you can install the certificate in multiple accounts by
 running the command with different install profiles provided.
 

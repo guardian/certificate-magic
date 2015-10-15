@@ -7,7 +7,7 @@ object Main extends App {
   case class Config(mode:String="", domain:String="", awsProfile:Option[String]=None, certificate:Option[File]=None, chain:Option[File]=None, force:Boolean=false, awsRegionName:Option[String]=None, installProfile:Option[String] = None)
 
   val parser = new scopt.OptionParser[Config]("cert-magic") {
-    head("certificate magic", "1.0")
+    head("certificate magic", "1.0-SNAPSHOT")
     note(
       """cert-magic is a tool to help create https certificates and install them in AWS.
         |
