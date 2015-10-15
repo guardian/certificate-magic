@@ -9,17 +9,18 @@ object Main extends App {
   val parser = new scopt.OptionParser[Config]("cert-magic") {
     head("certificate magic", "1.0-SNAPSHOT")
     note(
-      """cert-magic is a tool to help create https certificates and install them in AWS.
+      s"""cert-magic is a tool to help create https certificates and install them in AWS.
         |
-        |The process for creating a certificate is as follows:
+        |${Console.BOLD}DESCRIPTION${Console.RESET}
+        |  To set up a new certificate in AWS perform the following steps
         |
-        |1. run the create command to generate a CSR and encrypted private key
-        |2. (IRL) get the certificate issued using your provider
-        |3. run the install command with the certificate you get back from (2.)
-        |4. (IRL) set up the certificate for your application and test it is working
-        |5. run tidy to delete the temporary files
+        |  1. run the create command to generate a CSR and encrypted private key
+        |  2. (IRL) get the certificate issued using your provider
+        |  3. run the install command with the certificate you get back from (2.)
+        |  4. (IRL) set up the certificate for your application and test it is working
+        |  5. run tidy to delete the temporary files
         |
-        |Examples:
+        |${Console.BOLD}EXAMPLES${Console.RESET}
         |  Create a new CSR for your domain, using your configured AWS profile
         |    cert-magic create -d www.example.com -p my-aws-profile
         |  Create a CSR for a wildcard domain, specifying the region
@@ -42,14 +43,16 @@ object Main extends App {
       opt[String]('r', "region") optional() action { (x, c) =>
         c.copy(awsRegionName = Some(x))
       } text "(optionally), AWS region to use - you may have already configured the region in your AWS profile",
-        opt[Unit]('f', "force") optional() action { (_, c) => c.copy(force = true) }
+        opt[Unit]('f', "force") optional() action { (_, c) =>
+          c.copy(force = true)
+        } text "force the creation to overwrite an existing private key for this domain\n"
       )
     cmd("install") action { (_, c) =>
       c.copy(mode = "install") } text "install a certificate into your AWS account" children(
       opt[File]("certificate") required() action { (x, c) =>
-        c.copy(certificate = Some(x)) } text "provided certificate",
+        c.copy(certificate = Some(x)) } text "provided certificate/crt file" valueName "<certificate file>",
       opt[File]("chain") optional() action { (x, c) =>
-        c.copy(chain = Some(x)) } text "provided certificate chain/bundle (will try to build it if not provided)",
+        c.copy(chain = Some(x)) } text "provided certificate chain/bundle file (will try to build it if not provided)" valueName "<chain/bundle file>",
       opt[String]('p', "profile") optional() action { (x, c) =>
         c.copy(awsProfile = Some(x))
       } text "(optionally), AWS profile to provide credentials",
