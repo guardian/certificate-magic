@@ -2,22 +2,92 @@
 
 Certificate Magic! helps make it easy create and install certificates.
 
-This process is typically in two phases - creating a private key and certificate signing request and then, when you later get a certificate uploading it into AWS.
+To set up a new certificate in AWS perform the following steps
 
-The app has `create` and `install` commands that cover these two phases as well as `list` for tracking requests. Once a certificate has been successfully installed the `tidy` command will remove the intermediate files.
+1. run the create command to generate a CSR and encrypted private key
+2. (IRL) get the certificate issued using your provider
+3. run the install command with the certificate you get back from (2.)
+4. (IRL) set up the certificate for your application and test it is working
+5. run tidy to delete the temporary files
 
-== Create
+== Installing Certificate Magic!
 
-This creates a keypair and certificate signing request for the given domain. The private key is encrypted using AWS KMS and stored under ~/.magic in your home directory. The CSR is displayed (and also saved to a file) so that you can send the CSR to a CA for signing.
+https://github.com/guardian/certificate-magic/releases/latest[Fetch the latest jar file from the releases section of this repo via this link].
 
-== Install
+You can then run Certificate Magic! directly using
+`java -jar <path to>/cert-magic.jar <args>`
+but it's usually simpler to create an executable script you can use
+directly.
 
-When you get your certificate back, use the install mode to validate and upload your certificate into IAM. The private key will be decrypted appropriately and installed alongside the certificate and certificate chain.
+To create a script to run the jar, create a file at `~/bin/cert-magic`
+with the following contents. Be sure to replace `$(dirname $0)/cert-magic.jar`
+with the path to your downloaded `cert-magic.jar`,
+unless you put the jar in the same folder as the script.
 
-== List
+    #!/bin/bash
+    java -jar $(dirname $0)/cert-magic.jar "$@"
+
+Make the script executable:
+
+    chmod u+x ~/bin/cert-magic
+
+(Make sure your `bin` directory is on your path)
+
+== Examples
+
+Create a new CSR for your domain, using your configured AWS profile
+
+    cert-magic create -d www.example.com -p my-aws-profile
+
+Create a CSR for a wildcard domain, specifying the region
+
+    cert-magic create -d *.example.com -p my-profile -r eu-west-1
+
+Install a certificate into AWS
+
+    cert-magic install --certificate <path to cert> --chain <path to chain/bundle> -p aws-profile
+
+Install a certificate into a second (different) AWS account
+
+    cert-magic install --certificate <path to cert> --chain <path to chain/bundle> -p aws-profile --installProfile different-aws-profile
+
+Delete the files associated with a domain (to clear up after
+installation)
+
+    cert-magic tidy -d www.example.com
+
+== Commands
+
+Here is a little more detail on each command
+
+=== Create
+
+This creates a keypair and certificate signing request for the given
+domain. The private key is encrypted using AWS KMS and stored under
+~/.certmagic in your home directory. The CSR is displayed (and also
+saved to a file) so that you can send the CSR to a CA for signing.
+
+=== Install
+
+When you get your certificate back, use the install mode to validate
+and upload your certificate into IAM. The private key will be
+decrypted appropriately and installed alongside the certificate and
+certificate chain.
+
+If you are uploading the same certificate to multiple AWS accounts
+you'll need to use the optional `installProfile` flag. This allows you
+to specify a profile to use for the certificate installation.  You'll
+still need to provide the same profile you used to create the
+certificate so that the private key can be correctly decrypted. In
+this way you can install the certificate in multiple accounts by
+running the command with different install profiles provided.
+
+=== List
 
 List the private keys and CSRs that are outstanding.
 
-== Tidy
+=== Tidy
 
-Deletes the files associated with a domain to remove any access to the private key. This should be done after a domain is installed and has been tested.
+Deletes the files associated with a domain to remove any access to the
+private key. This should be done after a domain is installed and has
+been tested.
