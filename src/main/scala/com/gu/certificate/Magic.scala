@@ -6,7 +6,7 @@ import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.auth.{AWSCredentialsProvider, STSAssumeRoleSessionCredentialsProvider, _}
 import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClient
-import com.amazonaws.services.identitymanagement.model.UploadServerCertificateRequest
+import com.amazonaws.services.identitymanagement.model.{LimitExceededException, UploadServerCertificateRequest}
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 
@@ -90,15 +90,20 @@ object Magic extends BouncyCastle with FileHelpers {
     System.err.println(s"installing to IAM")
 
     val iamClient = region.createClient(classOf[AmazonIdentityManagementClient], installCredentialsProvider, null)
-    val uploadResult = iamClient.uploadServerCertificate(
-      new UploadServerCertificateRequest()
-        .withServerCertificateName(s"$safeDomain-exp$expDate")
-        .withPrivateKey(decryptedPem)
-        .withCertificateBody(certificatePem)
-        .withCertificateChain(chainPem)
-    )
+    val certificateUploadRequest = new UploadServerCertificateRequest()
+      .withServerCertificateName(s"$safeDomain-exp$expDate")
+      .withPrivateKey(decryptedPem)
+      .withCertificateBody(certificatePem)
+      .withCertificateChain(chainPem)
 
-    System.err.println(s"successfully installed certificate in IAM as ${uploadResult.getServerCertificateMetadata.getArn}")
+    Try {
+      val certificateUploadResult = iamClient.uploadServerCertificate(certificateUploadRequest)
+      val certificateArn = certificateUploadResult.getServerCertificateMetadata.getArn
+      System.err.println(s"successfully installed certificate in IAM as ${certificateArn}")
+    } recover {
+      case e: LimitExceededException => System.err.println("You have reached the ServerCertificatesPerAccount limit for your account. Request more by opening a support ticket with AWS.")
+      case e: Throwable => System.err.println(s"An error occurred during upload: ${e}")
+    }
   }
 
   def list(): Unit = {
