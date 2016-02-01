@@ -56,6 +56,14 @@ installation)
 
     cert-magic tidy -d www.example.com
 
+== Checking certificates
+
+Once a certificate has been installed, check it using the
+https://www.ssllabs.com/ssltest/[SSL Labs server test], making sure 'Do not
+show the results on the boards' is checked.
+
+Anything less than an 'A' grade is worth investigating.
+
 == Commands
 
 Here is a little more detail on each command
