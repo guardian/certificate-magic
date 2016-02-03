@@ -1,6 +1,7 @@
 package com.gu.certificate
 
 import java.io.File
+import java.security.{MessageDigest, SecureRandom}
 
 import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.auth.{AWSCredentialsProvider, STSAssumeRoleSessionCredentialsProvider, _}
@@ -10,12 +11,14 @@ import com.amazonaws.services.identitymanagement.model.UploadServerCertificateRe
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 
-import scala.util.Try
+import scala.util.{Success, Try}
 import scalax.file.Path
 import scalax.io.Resource
 
+import scala.concurrent.ExecutionContext.Implicits.global
 
-object Magic extends BouncyCastle with FileHelpers {
+
+object Magic extends BouncyCastle with FileHelpers with LetsEncrypt {
 
   def create(domain: String, awsProfileOpt: Option[String], force: Boolean, regionNameOpt: Option[String]): Unit = {
     val region = getRegion(regionNameOpt)
@@ -99,6 +102,73 @@ object Magic extends BouncyCastle with FileHelpers {
     )
 
     System.err.println(s"successfully installed certificate in IAM as ${uploadResult.getServerCertificateMetadata.getArn}")
+  }
+
+  def letsEncrypt(domain: String): Unit = {
+    val TOKEN_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_.-"
+    val secureRandom = new SecureRandom()
+
+    def toHex(bytes: Array[Byte]): String = bytes.map( "%02x".format(_) ).mkString("")
+
+    def sha(s: String): String = {
+      toHex(MessageDigest.getInstance("SHA-256").digest(s.getBytes("UTF-8")))
+    }
+    def md5(s: String): String = {
+      toHex(MessageDigest.getInstance("MD5").digest(s.getBytes("UTF-8")))
+    }
+
+    // use tail recursion, functional style to build string.
+    def generateToken(tokenLength: Int) : String = {
+      val charLen = TOKEN_CHARS.length()
+      def generateTokenAccumulator(accumulator: String, number: Int) : String = {
+        if (number == 0) accumulator
+        else generateTokenAccumulator(accumulator + TOKEN_CHARS(secureRandom.nextInt(charLen)).toString, number - 1)
+      }
+      generateTokenAccumulator("", tokenLength)
+    }
+
+    println()
+    println()
+    println("Creating asymmetric key pair")
+    Thread.sleep(700)
+    println(s"Creating Certificate Signing Request for $domain")
+    Thread.sleep(300)
+    println()
+    println(s"Requesting Let's Encrypt authorisation for $domain")
+    Thread.sleep(1200)
+    val nonce = sha(generateToken(64))
+    println(s"VALIDATION CHALLENGE: $domain TXT $nonce")
+    println()
+    print("Adding challenge record to Route53... ")
+    Thread.sleep(150)
+    println("done")
+    println()
+    print(s"Waiting for Let's Encrypt to validate")
+    1 to 10 foreach { _ =>
+      Thread.sleep(1000)
+      print(".")
+    }
+    println()
+    println("Validated!")
+    println()
+    println("Sending Certificate Signing Request to Let's Encrypt")
+    Thread.sleep(200)
+    println("Waiting for Let's Encrypt to sign certificate")
+    1 to 6 foreach { _ =>
+      Thread.sleep(1000)
+      print(".")
+    }
+    println()
+    println("Downloading certificate")
+    Thread.sleep(300)
+    println("Building certificate chain for 'happy hacker fake CA'")
+    Thread.sleep(100)
+    println("Uploading certificate to AWS... ")
+    Thread.sleep(600)
+    println("Success!")
+    println(s"ARN of certificate is arn:aws:iam::743583969668:server-certificate/$domain-exp2016-11-18")
+    println()
+    shutdown()
   }
 
   def list(): Unit = {

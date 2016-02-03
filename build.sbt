@@ -13,7 +13,12 @@ libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.4",
   "joda-time" % "joda-time" % "2.8.1",
   "org.joda" % "joda-convert" % "1.8",
-  "org.scalatest" %% "scalatest" % "2.2.4" % "test"
+  "org.scalatest" %% "scalatest" % "2.2.4" % "test",
+  "net.databinder.dispatch" %% "dispatch-core" % "0.11.3",
+  "net.databinder.dispatch" %% "dispatch-json4s-native" % "0.11.3",
+  "org.glassfish.jersey.core" % "jersey-client" % "2.22.1",
+  "io.jsonwebtoken" % "jjwt" % "0.6.0",
+  "org.slf4j" % "slf4j-simple" % "1.7.13"
 )
 
 assemblyJarName in assembly := "cert-magic.jar"

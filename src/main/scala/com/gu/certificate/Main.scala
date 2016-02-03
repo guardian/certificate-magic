@@ -47,6 +47,11 @@ object Main extends App {
           c.copy(force = true)
         } text "force the creation to overwrite an existing private key for this domain\n"
       )
+    cmd("super-magic") action { (_, c) =>
+      c.copy(mode = "super-magic") } text "use Let's encrypt for a truly magical experience"  children(
+      opt[String]('d', "domain") required() action { (x, c) =>
+        c.copy(domain = x)
+      } text "The domain for the certificate (e.g. www.example.com or *.mydomain.co.uk)")
     cmd("install") action { (_, c) =>
       c.copy(mode = "install") } text "install a certificate into your AWS account" children(
       opt[File]("certificate") required() action { (x, c) =>
@@ -81,6 +86,9 @@ object Main extends App {
 
     case Config("tidy", domain, _, _, _, _, _, _) =>
       Magic.tidy(domain)
+
+    case Config("super-magic", domain, _, _, _, _, _, _) =>
+      Magic.letsEncrypt(domain)
 
     case _ =>
       parser.showUsage

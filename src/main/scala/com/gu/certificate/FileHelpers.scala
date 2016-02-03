@@ -3,6 +3,7 @@ package com.gu.certificate
 import java.io.File
 import java.nio.ByteBuffer
 
+import scala.io.Source
 import scalax.file.{Path, PathSet}
 
 trait FileHelpers {
@@ -15,9 +16,20 @@ trait FileHelpers {
     magicPath / s"$domain.$ext"
   }
 
+  def getFile(filename:String) = {
+    magicPath.createDirectory(createParents = true, failIfExists = false)
+    magicPath / s"$filename"
+  }
+
   def listFiles(ext:String): PathSet[Path] = {
     if (magicPath.exists) magicPath ** s"*.$ext"
     else PathSet()
+  }
+
+  def saveFile(content:String, filename:String): File = {
+    val file = getFile(filename)
+    file.write(content)
+    file.fileOption.get
   }
 
   def saveFile(content:String, domain:String, ext:String): File = {
