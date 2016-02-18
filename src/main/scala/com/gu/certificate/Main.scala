@@ -4,7 +4,7 @@ import java.io.File
 
 
 object Main extends App {
-  case class Config(mode:String="", domain:String="", awsProfile:Option[String]=None, certificate:Option[File]=None, chain:Option[File]=None, force:Boolean=false, awsRegionName:Option[String]=None, installProfile:Option[String] = None)
+  case class Config(mode:String="", domain:String="", awsProfile:Option[String]=None, certificate:Option[File]=None, chain:Option[File]=None, force:Boolean=false, awsRegionName:Option[String]=None, installProfile:Option[String] = None, path:Option[String] = None)
 
   val parser = new scopt.OptionParser[Config]("cert-magic") {
     head("certificate magic", "1.0-SNAPSHOT")
@@ -60,7 +60,9 @@ object Main extends App {
         c.copy(awsRegionName = Some(x))
       } text "(optionally), AWS region to use - you may have already configured the region in your AWS profile",
       opt[String]("installProfile") optional() action { (x, c) =>
-        c.copy(installProfile = Some(x)) } text "(optionally), an alternative AWS profile to install the cert in a different account\n"
+        c.copy(installProfile = Some(x)) } text "(optionally), an alternative AWS profile to install the cert in a different account\n",
+      opt[String]("path") optional() action { (x, c) =>
+        c.copy(path = Some(x))} text "(optionally), the certificate path; this must start with /cloudfront/ if you want to use it in Cloudfront"
       )
     cmd("tidy") action { (_, c) =>
       c.copy(mode = "tidy") } text "delete files associated with this domain" children(
@@ -70,16 +72,16 @@ object Main extends App {
   }
 
   parser.parse(args, Config()) foreach {
-    case Config("create", domain, profile, _, _, force, regionNameOpt, _) =>
+    case Config("create", domain, profile, _, _, force, regionNameOpt, _, _) =>
       Magic.create(domain, profile, force, regionNameOpt)
 
-    case Config("install", _, profile, Some(certificateFile), chainFile, _, regionNameOpt, installProfile) =>
-      Magic.install(profile, certificateFile, chainFile, regionNameOpt, installProfile)
+    case Config("install", _, profile, Some(certificateFile), chainFile, _, regionNameOpt, installProfile, path) =>
+      Magic.install(profile, certificateFile, chainFile, regionNameOpt, installProfile, path)
 
-    case Config("list", _, _, _, _, _, _, _) =>
+    case Config("list", _, _, _, _, _, _, _, _) =>
       Magic.list()
 
-    case Config("tidy", domain, _, _, _, _, _, _) =>
+    case Config("tidy", domain, _, _, _, _, _, _, _) =>
       Magic.tidy(domain)
 
     case _ =>
