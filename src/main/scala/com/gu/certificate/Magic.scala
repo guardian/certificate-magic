@@ -48,7 +48,7 @@ object Magic extends BouncyCastle with FileHelpers {
     System.err.println(s"Written encrypted PK to $pkEncFile and CSR to $csrFile")
   }
 
-  def install(keyProfile: Option[String], certificateFile: File, chainFile: Option[File], regionNameOpt: Option[String], installProfile:Option[String]): Unit = {
+  def install(keyProfile: Option[String], certificateFile: File, chainFile: Option[File], regionNameOpt: Option[String], installProfile:Option[String], path:Option[String]): Unit = {
     val region = getRegion(regionNameOpt)
     val keyCredentialsProvider = getCredentialsProvider(keyProfile)
     val installCredentialsProvider = installProfile.map(ip => getCredentialsProvider(Some(ip))).getOrElse(keyCredentialsProvider)
@@ -89,12 +89,15 @@ object Magic extends BouncyCastle with FileHelpers {
 
     System.err.println(s"installing to IAM")
 
+    val pathPrefix = path.getOrElse("").stripPrefix("/").replace("/", "-")
+
     val iamClient = region.createClient(classOf[AmazonIdentityManagementClient], installCredentialsProvider, null)
     val certificateUploadRequest = new UploadServerCertificateRequest()
-      .withServerCertificateName(s"$safeDomain-exp$expDate")
+      .withServerCertificateName(s"$pathPrefix$safeDomain-exp$expDate")
       .withPrivateKey(decryptedPem)
       .withCertificateBody(certificatePem)
       .withCertificateChain(chainPem)
+      .withPath(path.getOrElse("/"))
 
     Try {
       val certificateUploadResult = iamClient.uploadServerCertificate(certificateUploadRequest)
