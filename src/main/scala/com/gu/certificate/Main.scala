@@ -4,7 +4,7 @@ import java.io.File
 
 
 object Main extends App {
-  case class Config(mode:String="", domain:String="", awsProfile:Option[String]=None, certificate:Option[File]=None, chain:Option[File]=None, force:Boolean=false, awsRegionName:Option[String]=None, installProfile:Option[String] = None, path:Option[String] = None)
+  case class Config(mode:String="", domain:String="", awsProfile:Option[String]=None, certificate:Option[File]=None, chain:Option[File]=None, force:Boolean=false, awsRegionName:Option[String]=None, installProfile:Option[String] = None, path:Option[String] = None, awsService:Option[String] = Some("iam"))
 
   val parser = new scopt.OptionParser[Config]("cert-magic") {
     head("certificate magic", "1.0-SNAPSHOT")
@@ -29,6 +29,8 @@ object Main extends App {
         |    cert-magic install --certificate <path to cert> --chain <path to chain/bundle> -p aws-profile
         |  Install a certificate into a second (different) AWS account
         |    cert-magic install --certificate <path to cert> --chain <path to chain/bundle> -p aws-profile --installProfile different-aws-profile
+        |  Install a certificate into a second (not IAM) AWS service (e.g. API GateWay)
+        |    cert-magic install --certificate <path to cert> --chain <path to chain/bundle> -p aws-profile --service apigateway
         |  Delete the files associated with a domain (to clear up after installation)
         |    cert-magic tidy -d www.example.com
         |""".stripMargin)
@@ -62,7 +64,12 @@ object Main extends App {
       opt[String]("installProfile") optional() action { (x, c) =>
         c.copy(installProfile = Some(x)) } text "(optionally), an alternative AWS profile to install the cert in a different account\n",
       opt[String]("path") optional() action { (x, c) =>
-        c.copy(path = Some(x))} text "(optionally), the certificate path; this must start with /cloudfront/ if you want to use it in Cloudfront"
+        c.copy(path = Some(x))} text "(optionally), the certificate path; this must start with /cloudfront/ if you want to use it in Cloudfront",
+      opt[String]('s', "service") optional() action { (x, c) =>
+        c.copy(awsService = Some(x))
+      } text "(optionally), AWS service - defaults to 'iam', accepted values: 'iam' 'apigateway'" validate ( x =>
+        if (List("iam", "apigateway").contains(x)) success
+        else failure("Option --service can only be 'iam' or 'apigateway'") )
       )
     cmd("tidy") action { (_, c) =>
       c.copy(mode = "tidy") } text "delete files associated with this domain" children(
@@ -72,16 +79,16 @@ object Main extends App {
   }
 
   parser.parse(args, Config()) foreach {
-    case Config("create", domain, profile, _, _, force, regionNameOpt, _, _) =>
+    case Config("create", domain, profile, _, _, force, regionNameOpt, _, _, _) =>
       Magic.create(domain, profile, force, regionNameOpt)
 
-    case Config("install", _, profile, Some(certificateFile), chainFile, _, regionNameOpt, installProfile, path) =>
-      Magic.install(profile, certificateFile, chainFile, regionNameOpt, installProfile, path)
+    case Config("install", _, profile, Some(certificateFile), chainFile, _, regionNameOpt, installProfile, path, service) =>
+      Magic.install(profile, certificateFile, chainFile, regionNameOpt, installProfile, path, service)
 
-    case Config("list", _, _, _, _, _, _, _, _) =>
+    case Config("list", _, _, _, _, _, _, _, _, _) =>
       Magic.list()
 
-    case Config("tidy", domain, _, _, _, _, _, _, _) =>
+    case Config("tidy", domain, _, _, _, _, _, _, _,_) =>
       Magic.tidy(domain)
 
     case _ =>
