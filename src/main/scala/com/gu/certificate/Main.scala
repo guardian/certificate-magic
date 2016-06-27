@@ -4,7 +4,9 @@ import java.io.File
 
 
 object Main extends App {
-  case class Config(mode:String="", domain:String="", awsProfile:Option[String]=None, certificate:Option[File]=None, chain:Option[File]=None, force:Boolean=false, awsRegionName:Option[String]=None, installProfile:Option[String] = None, path:Option[String] = None, awsService:Option[String] = Some("iam"))
+  case class Config(mode:String="", domain:String="", awsProfile:Option[String]=None, certificate:Option[File]=None,
+                    chain:Option[File]=None, force:Boolean=false, awsRegionName:Option[String]=None, installProfile:Option[String] = None,
+                    path:Option[String] = None, awsService:Option[String] = Some("iam"), apigatewayDomain:Option[String] = None)
 
   val parser = new scopt.OptionParser[Config]("cert-magic") {
     head("certificate magic", "1.0-SNAPSHOT")
@@ -69,7 +71,10 @@ object Main extends App {
         c.copy(awsService = Some(x))
       } text "(optionally), AWS service - defaults to 'iam', accepted values: 'iam' 'apigateway'" validate ( x =>
         if (List("iam", "apigateway").contains(x)) success
-        else failure("Option --service can only be 'iam' or 'apigateway'") )
+        else failure("Option --service can only be 'iam' or 'apigateway'") ),
+      opt[String]('n', "name") optional() action { (x, c) =>
+        c.copy(apigatewayDomain = Some(x))
+      } text "(optionally), API GateWay domain name - required when uploading a wildcard certificate"
       )
     cmd("tidy") action { (_, c) =>
       c.copy(mode = "tidy") } text "delete files associated with this domain" children(
@@ -79,16 +84,16 @@ object Main extends App {
   }
 
   parser.parse(args, Config()) foreach {
-    case Config("create", domain, profile, _, _, force, regionNameOpt, _, _, _) =>
+    case Config("create", domain, profile, _, _, force, regionNameOpt, _, _, _, _) =>
       Magic.create(domain, profile, force, regionNameOpt)
 
-    case Config("install", _, profile, Some(certificateFile), chainFile, _, regionNameOpt, installProfile, path, service) =>
-      Magic.install(profile, certificateFile, chainFile, regionNameOpt, installProfile, path, service)
+    case Config("install", _, profile, Some(certificateFile), chainFile, _, regionNameOpt, installProfile, path, service, apiGatewayDomainName) =>
+      Magic.install(profile, certificateFile, chainFile, regionNameOpt, installProfile, path, service, apiGatewayDomainName)
 
-    case Config("list", _, _, _, _, _, _, _, _, _) =>
+    case Config("list", _, _, _, _, _, _, _, _, _, _) =>
       Magic.list()
 
-    case Config("tidy", domain, _, _, _, _, _, _, _,_) =>
+    case Config("tidy", domain, _, _, _, _, _, _, _,_, _) =>
       Magic.tidy(domain)
 
     case _ =>

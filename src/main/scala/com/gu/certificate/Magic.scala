@@ -50,7 +50,8 @@ object Magic extends BouncyCastle with FileHelpers {
     System.err.println(s"Written encrypted PK to $pkEncFile and CSR to $csrFile")
   }
 
-  def install(keyProfile: Option[String], certificateFile: File, chainFile: Option[File], regionNameOpt: Option[String], installProfile:Option[String], path:Option[String], service:Option[String]): Unit = {
+  def install(keyProfile: Option[String], certificateFile: File, chainFile: Option[File], regionNameOpt: Option[String],
+              installProfile:Option[String], path:Option[String], service:Option[String], apiGatewayDomainName: Option[String]): Unit = {
     val region = getRegion(regionNameOpt)
     val keyCredentialsProvider = getCredentialsProvider(keyProfile)
     val installCredentialsProvider = installProfile.map(ip => getCredentialsProvider(Some(ip))).getOrElse(keyCredentialsProvider)
@@ -94,7 +95,9 @@ object Magic extends BouncyCastle with FileHelpers {
 
     service match {
       case Some("iam") => installToIAM(path, region, installCredentialsProvider, certificateName, decryptedPem, certificatePem, chainPem)
-      case Some("apigateway") => installToGateway(region, installCredentialsProvider, safeDomain, certificateName, decryptedPem, certificatePem, chainPem)
+      case Some("apigateway") =>
+        val validDomainName = validateAndGetAPIGateWayDomainName(domain, apiGatewayDomainName)
+        installToGateway(region, installCredentialsProvider, validDomainName, certificateName, decryptedPem, certificatePem, chainPem)
       case _ => None
     }
   }
@@ -120,12 +123,12 @@ object Magic extends BouncyCastle with FileHelpers {
     }
   }
 
-  def installToGateway (region: Region, installCredentialsProvider: AWSCredentialsProvider, safeDomain: String, certificateName: String, decryptedPem: String, certificatePem: String, chainPem: String): Unit = {
+  def installToGateway (region: Region, installCredentialsProvider: AWSCredentialsProvider, domain: String, certificateName: String, decryptedPem: String, certificatePem: String, chainPem: String): Unit = {
     System.err.println(s"installing to API GateWay")
 
     val client = region.createClient(classOf[AmazonApiGatewayClient], installCredentialsProvider, null)
     val createDomainNameRequest = new CreateDomainNameRequest()
-      .withDomainName(safeDomain)
+      .withDomainName(domain)
       .withCertificateName(certificateName)
       .withCertificateBody(certificatePem)
       .withCertificatePrivateKey(decryptedPem)
@@ -138,6 +141,24 @@ object Magic extends BouncyCastle with FileHelpers {
     } recover {
       case e: TooManyRequestsException => System.err.println(s"You have reached the create domain name limit for your account. Retry in ${e.getRetryAfterSeconds} seconds.")
       case e: Throwable => System.err.println(s"An error occurred during domain name creation: $e")
+    }
+  }
+
+  private def validateAndGetAPIGateWayDomainName (domain: String, apiGatewayDomainName: Option[String]): String = {
+    def isStarDomain (name: String): Boolean = {
+      name.startsWith("*")
+    }
+    def isDomainIncluded (desiredDomain: String, starDomain: String): Boolean = {
+      desiredDomain.endsWith(starDomain.substring(1))
+    }
+
+    apiGatewayDomainName match {
+      case Some(gatewayDomain) if isStarDomain(domain) && isDomainIncluded(gatewayDomain, domain) => gatewayDomain
+      case Some(gatewayDomain) if isStarDomain(domain) => throw new RuntimeException(s"The API GateWay domain name '$gatewayDomain' is not a subdomain of '$domain'")
+      case Some(gatewayDomain) if gatewayDomain.equals(domain) => gatewayDomain
+      case Some(gatewayDomain) => throw new RuntimeException("You can only install an API GateWay domain name with a wildcard certificate or a certificate for the same domain")
+      case None if isStarDomain(domain) => throw new RuntimeException("You must specify a domain name when uploading wildcard certificates to API GateWay")
+      case None => domain
     }
   }
 
